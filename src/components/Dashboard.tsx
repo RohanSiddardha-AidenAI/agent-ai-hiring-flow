@@ -1,18 +1,23 @@
 
-import { useState } from 'react';
-import { Bot, Activity, CheckCircle, Clock, Users, Target, TrendingUp, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bot, Activity, CheckCircle, Clock, Users, Target, TrendingUp, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AgentFlowModal from './AgentFlowModal';
+import WorkflowStepper from './WorkflowStepper';
+import BusinessRulesPanel from './BusinessRulesPanel';
+import CandidateTable from './CandidateTable';
 import { agents } from '@/data/agents';
-import { mockCandidates } from '@/data/candidates';
 
 const Dashboard = () => {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [simulationMode, setSimulationMode] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [showBusinessRules, setShowBusinessRules] = useState(false);
+  const [agentStatuses, setAgentStatuses] = useState(agents.map(agent => ({ ...agent })));
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -28,7 +33,7 @@ const Dashboard = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 animate-pulse';
       case 'completed':
         return 'bg-green-100 text-green-800';
       default:
@@ -38,17 +43,40 @@ const Dashboard = () => {
 
   const handleStartSimulation = () => {
     setIsRunning(true);
-    // Simulate agent progression
-    setTimeout(() => {
-      agents.forEach((agent, index) => {
-        setTimeout(() => {
-          agent.status = 'running';
-        }, index * 1000);
-        setTimeout(() => {
-          agent.status = 'completed';
-        }, (index + 1) * 2000);
-      });
-    }, 500);
+    setCurrentStep(0);
+    
+    // Reset all agents to idle
+    setAgentStatuses(agents.map(agent => ({ ...agent, status: 'idle' })));
+    
+    // Determine starting point based on mode
+    const startIndex = simulationMode === 'manual' ? 1 : 0; // Manual starts from Recruiter Assist (index 1)
+    
+    // Animate through agents with realistic timing
+    const animateAgents = async () => {
+      for (let i = startIndex; i < agents.length; i++) {
+        // Set current agent to running
+        setAgentStatuses(prev => prev.map((agent, index) => 
+          index === i ? { ...agent, status: 'running' } : agent
+        ));
+        setCurrentStep(i + 1);
+        
+        // Wait for agent processing time (2-4 seconds)
+        await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
+        
+        // Set current agent to completed
+        setAgentStatuses(prev => prev.map((agent, index) => 
+          index === i ? { ...agent, status: 'completed' } : agent
+        ));
+      }
+      
+      // Simulation complete
+      setTimeout(() => {
+        setIsRunning(false);
+        setCurrentStep(8);
+      }, 1000);
+    };
+    
+    animateAgents();
   };
 
   return (
@@ -70,6 +98,15 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowBusinessRules(true)}
+                className="flex items-center space-x-2"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Business Rules</span>
+              </Button>
+              
               <Select value={simulationMode} onValueChange={setSimulationMode}>
                 <SelectTrigger className="w-64">
                   <SelectValue placeholder="Select Hiring Campaign" />
@@ -93,6 +130,9 @@ const Dashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Workflow Stepper */}
+        <WorkflowStepper isRunning={isRunning} currentStep={currentStep} />
+
         {/* KPI Dashboard */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -146,11 +186,17 @@ const Dashboard = () => {
 
         {/* Agents Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {agents.map((agent) => (
-            <Card key={agent.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+          {agentStatuses.map((agent, index) => (
+            <Card key={agent.id} className={`hover:shadow-lg transition-all duration-300 cursor-pointer ${
+              agent.status === 'running' ? 'ring-2 ring-blue-400 shadow-lg transform scale-105' : 
+              agent.status === 'completed' ? 'ring-2 ring-green-400' : ''
+            }`}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 bg-[#4da6ff] rounded-lg flex items-center justify-center">
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-300 ${
+                    agent.status === 'running' ? 'bg-blue-500 animate-pulse' :
+                    agent.status === 'completed' ? 'bg-green-500' : 'bg-[#4da6ff]'
+                  }`}>
                     <Bot className="w-6 h-6 text-white" />
                   </div>
                   <Badge className={getStatusColor(agent.status)}>
@@ -186,35 +232,8 @@ const Dashboard = () => {
           ))}
         </div>
 
-        {/* Recent Activity */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="text-[#002b5c]">Recent Activity</CardTitle>
-            <CardDescription>Latest hiring pipeline updates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {mockCandidates.slice(0, 5).map((candidate, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-[#4da6ff] rounded-full flex items-center justify-center">
-                      <span className="text-white font-medium">
-                        {candidate.name.split(' ').map(n => n[0]).join('')}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-[#002b5c]">{candidate.name}</p>
-                      <p className="text-sm text-[#4d4d4d]">{candidate.role_applied} • Score: {candidate.screening_score}</p>
-                    </div>
-                  </div>
-                  <Badge className={candidate.screening_score >= 85 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                    {candidate.screening_score >= 85 ? 'Shortlisted' : 'Under Review'}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Enhanced Candidate Table */}
+        <CandidateTable />
       </div>
 
       {/* Agent Flow Modal */}
@@ -225,6 +244,12 @@ const Dashboard = () => {
           simulationMode={simulationMode}
         />
       )}
+
+      {/* Business Rules Panel */}
+      <BusinessRulesPanel 
+        isOpen={showBusinessRules}
+        onClose={() => setShowBusinessRules(false)}
+      />
     </div>
   );
 };
