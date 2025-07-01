@@ -9,6 +9,7 @@ import AgentFlowModal from './AgentFlowModal';
 import WorkflowStepper from './WorkflowStepper';
 import BusinessRulesPanel from './BusinessRulesPanel';
 import CandidateTable from './CandidateTable';
+import JobSetupModal, { JobData } from './JobSetupModal';
 import { agents } from '@/data/agents';
 
 const Dashboard = () => {
@@ -17,7 +18,16 @@ const Dashboard = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [showBusinessRules, setShowBusinessRules] = useState(false);
+  const [showJobSetup, setShowJobSetup] = useState(false);
+  const [jobData, setJobData] = useState<JobData | null>(null);
   const [agentStatuses, setAgentStatuses] = useState(agents.map(agent => ({ ...agent })));
+  const [workflowStats, setWorkflowStats] = useState({
+    profilesFetched: 0,
+    screened: 0,
+    shortlisted: 0,
+    interviewsScheduled: 0,
+    offersGenerated: 0
+  });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -41,15 +51,37 @@ const Dashboard = () => {
     }
   };
 
-  const handleStartSimulation = () => {
+  const handleJobSetup = (data: JobData) => {
+    setJobData(data);
+    // Start simulation automatically after job setup
+    handleStartSimulation(true);
+  };
+
+  const handleStartSimulation = (fromJobSetup = false) => {
+    const isManual = simulationMode === 'manual';
+    
+    if (isManual && !fromJobSetup && !jobData) {
+      setShowJobSetup(true);
+      return;
+    }
+
     setIsRunning(true);
     setCurrentStep(0);
     
     // Reset all agents to idle
     setAgentStatuses(agents.map(agent => ({ ...agent, status: 'idle' })));
     
+    // Reset workflow stats
+    setWorkflowStats({
+      profilesFetched: 0,
+      screened: 0,
+      shortlisted: 0,
+      interviewsScheduled: 0,
+      offersGenerated: 0
+    });
+    
     // Determine starting point based on mode
-    const startIndex = simulationMode === 'manual' ? 1 : 0; // Manual starts from Recruiter Assist (index 1)
+    const startIndex = isManual ? 1 : 0; // Manual starts from Recruiter Assist (index 1)
     
     // Animate through agents with realistic timing
     const animateAgents = async () => {
@@ -59,6 +91,9 @@ const Dashboard = () => {
           index === i ? { ...agent, status: 'running' } : agent
         ));
         setCurrentStep(i + 1);
+        
+        // Update workflow stats based on agent
+        updateWorkflowStats(i, isManual);
         
         // Wait for agent processing time (2-4 seconds)
         await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
@@ -77,6 +112,30 @@ const Dashboard = () => {
     };
     
     animateAgents();
+  };
+
+  const updateWorkflowStats = (agentIndex: number, isManual: boolean) => {
+    setWorkflowStats(prev => {
+      const newStats = { ...prev };
+      
+      switch (agentIndex) {
+        case 2: // Data Management
+          newStats.profilesFetched = 500;
+          break;
+        case 3: // Resume Screening
+          newStats.screened = 500;
+          newStats.shortlisted = 20;
+          break;
+        case 5: // Workflow Automation
+          newStats.offersGenerated = 5;
+          break;
+        case 6: // Communication
+          newStats.interviewsScheduled = 15;
+          break;
+      }
+      
+      return newStats;
+    });
   };
 
   return (
@@ -118,7 +177,7 @@ const Dashboard = () => {
               </Select>
               
               <Button 
-                onClick={handleStartSimulation}
+                onClick={() => handleStartSimulation()}
                 disabled={!simulationMode || isRunning}
                 className="bg-[#002b5c] hover:bg-[#001a3d]"
               >
@@ -130,8 +189,77 @@ const Dashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Job Setup Display */}
+        {jobData && (
+          <Card className="mb-6 border-[#4da6ff]">
+            <CardHeader>
+              <CardTitle className="text-[#002b5c] flex items-center space-x-2">
+                <span>Current Job Setup</span>
+                <Badge className="bg-[#4da6ff] text-white">Manual Mode</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-[#4d4d4d]">Position</p>
+                  <p className="font-semibold text-[#002b5c]">{jobData.title}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#4d4d4d]">Location</p>
+                  <p className="font-semibold text-[#002b5c]">{jobData.location}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#4d4d4d]">Remote</p>
+                  <p className="font-semibold text-[#002b5c]">{jobData.remote ? 'Yes' : 'No'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#4d4d4d]">Key Skills</p>
+                  <p className="font-semibold text-[#002b5c]">{jobData.skills.slice(0, 3).join(', ')}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Workflow Stepper */}
-        <WorkflowStepper isRunning={isRunning} currentStep={currentStep} />
+        <WorkflowStepper 
+          isRunning={isRunning} 
+          currentStep={currentStep} 
+          isManualMode={simulationMode === 'manual'}
+        />
+
+        {/* Workflow Stats */}
+        {(workflowStats.profilesFetched > 0 || isRunning) && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-[#002b5c]">Workflow Progress Stats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-5 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.profilesFetched}</p>
+                  <p className="text-sm text-[#4d4d4d]">Profiles Fetched</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.screened}</p>
+                  <p className="text-sm text-[#4d4d4d]">Screened</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.shortlisted}</p>
+                  <p className="text-sm text-[#4d4d4d]">Shortlisted</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.interviewsScheduled}</p>
+                  <p className="text-sm text-[#4d4d4d]">Interviews Scheduled</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.offersGenerated}</p>
+                  <p className="text-sm text-[#4d4d4d]">Offers Generated</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* KPI Dashboard */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
@@ -190,13 +318,13 @@ const Dashboard = () => {
             <Card key={agent.id} className={`hover:shadow-lg transition-all duration-300 cursor-pointer ${
               agent.status === 'running' ? 'ring-2 ring-blue-400 shadow-lg transform scale-105' : 
               agent.status === 'completed' ? 'ring-2 ring-green-400' : ''
-            }`}>
+            } ${simulationMode === 'manual' && index === 0 ? 'opacity-50' : ''}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-300 ${
                     agent.status === 'running' ? 'bg-blue-500 animate-pulse' :
                     agent.status === 'completed' ? 'bg-green-500' : 'bg-[#4da6ff]'
-                  }`}>
+                  } ${simulationMode === 'manual' && index === 0 ? 'bg-gray-400' : ''}`}>
                     <Bot className="w-6 h-6 text-white" />
                   </div>
                   <Badge className={getStatusColor(agent.status)}>
@@ -206,7 +334,12 @@ const Dashboard = () => {
                     </div>
                   </Badge>
                 </div>
-                <CardTitle className="text-lg text-[#002b5c]">{agent.name}</CardTitle>
+                <CardTitle className={`text-lg ${simulationMode === 'manual' && index === 0 ? 'text-gray-500' : 'text-[#002b5c]'}`}>
+                  {agent.name}
+                  {simulationMode === 'manual' && index === 0 && (
+                    <span className="text-xs text-gray-400 block">Skipped in Manual Mode</span>
+                  )}
+                </CardTitle>
                 <CardDescription className="text-sm">{agent.description}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -224,6 +357,7 @@ const Dashboard = () => {
                   variant="outline" 
                   className="w-full"
                   onClick={() => setSelectedAgent(agent)}
+                  disabled={simulationMode === 'manual' && index === 0}
                 >
                   View Flow
                 </Button>
@@ -235,6 +369,13 @@ const Dashboard = () => {
         {/* Enhanced Candidate Table */}
         <CandidateTable />
       </div>
+
+      {/* Job Setup Modal */}
+      <JobSetupModal 
+        isOpen={showJobSetup}
+        onClose={() => setShowJobSetup(false)}
+        onSubmit={handleJobSetup}
+      />
 
       {/* Agent Flow Modal */}
       {selectedAgent && (
