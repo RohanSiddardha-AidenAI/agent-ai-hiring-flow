@@ -115,7 +115,7 @@ const CandidateTable = () => {
               <SelectItem value="all">All Scores</SelectItem>
               <SelectItem value="high">High (85+)</SelectItem>
               <SelectItem value="medium">Medium (70-84)</SelectItem>
-              <SelectItem value="low">Low (<70)</SelectItem>
+              <SelectItem value="low">Low (&lt;70)</SelectItem>
             </SelectContent>
           </Select>
           
