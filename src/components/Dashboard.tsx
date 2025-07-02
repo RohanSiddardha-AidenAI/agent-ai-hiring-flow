@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Bot, Activity, CheckCircle, Clock, Users, Target, TrendingUp, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import BusinessRulesPanel from './BusinessRulesPanel';
 import CandidateTable from './CandidateTable';
 import JobSetupModal, { JobData } from './JobSetupModal';
 import WorkflowHistory from './WorkflowHistory';
+import ExecutionLogConsole from './ExecutionLogConsole';
 import { agents } from '@/data/agents';
 
 interface WorkflowExecution {
