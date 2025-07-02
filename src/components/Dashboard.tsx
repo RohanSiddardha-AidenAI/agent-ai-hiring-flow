@@ -47,6 +47,8 @@ const Dashboard = () => {
   });
   const [currentExecution, setCurrentExecution] = useState<WorkflowExecution | null>(null);
   const [sessionProcessedCounts, setSessionProcessedCounts] = useState<{ [key: string]: number }>({});
+  const [showExecutionLog, setShowExecutionLog] = useState(false);
+  const [selectedHistoryExecution, setSelectedHistoryExecution] = useState<WorkflowExecution | null>(null);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -86,6 +88,7 @@ const Dashboard = () => {
 
     setIsRunning(true);
     setCurrentStep(0);
+    setShowExecutionLog(true); // Show execution log when simulation starts
     
     // Create new execution record
     const newExecution: WorkflowExecution = {
@@ -215,6 +218,10 @@ const Dashboard = () => {
     setSessionProcessedCounts(prev => ({ ...prev, [agentId]: count }));
   };
 
+  const handleHistoryExecutionSelect = (execution: WorkflowExecution | null) => {
+    setSelectedHistoryExecution(execution);
+  };
+
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-[#f5f5f5]">
@@ -310,34 +317,50 @@ const Dashboard = () => {
           <WorkflowHistory 
             currentExecution={currentExecution}
             onAddExecution={() => {}}
+            onExecutionSelect={handleHistoryExecutionSelect}
           />
 
           {/* Workflow Stats */}
           {(workflowStats.profilesFetched > 0 || isRunning) && (
             <Card className="mb-6">
               <CardHeader>
-                <CardTitle className="text-[#002b5c]">Workflow Progress Stats</CardTitle>
+                <CardTitle className="text-[#002b5c]">
+                  {selectedHistoryExecution ? 
+                    `Workflow Stats - ${selectedHistoryExecution.jobTitle}` : 
+                    'Current Workflow Progress Stats'
+                  }
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-5 gap-4">
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.profilesFetched}</p>
+                    <p className="text-2xl font-bold text-[#4da6ff]">
+                      {selectedHistoryExecution ? selectedHistoryExecution.kpis.profilesFetched : workflowStats.profilesFetched}
+                    </p>
                     <p className="text-sm text-[#4d4d4d]">Profiles Fetched</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.screened}</p>
+                    <p className="text-2xl font-bold text-[#4da6ff]">
+                      {selectedHistoryExecution ? selectedHistoryExecution.kpis.screened : workflowStats.screened}
+                    </p>
                     <p className="text-sm text-[#4d4d4d]">Screened</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.shortlisted}</p>
+                    <p className="text-2xl font-bold text-[#4da6ff]">
+                      {selectedHistoryExecution ? selectedHistoryExecution.kpis.shortlisted : workflowStats.shortlisted}
+                    </p>
                     <p className="text-sm text-[#4d4d4d]">Shortlisted</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.interviewsScheduled}</p>
+                    <p className="text-2xl font-bold text-[#4da6ff]">
+                      {selectedHistoryExecution ? selectedHistoryExecution.kpis.interviewsScheduled : workflowStats.interviewsScheduled}
+                    </p>
                     <p className="text-sm text-[#4d4d4d]">Interviews Scheduled</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-[#4da6ff]">{workflowStats.offersGenerated}</p>
+                    <p className="text-2xl font-bold text-[#4da6ff]">
+                      {selectedHistoryExecution ? selectedHistoryExecution.kpis.offersGenerated : workflowStats.offersGenerated}
+                    </p>
                     <p className="text-sm text-[#4d4d4d]">Offers Generated</p>
                   </div>
                 </div>
@@ -467,6 +490,14 @@ const Dashboard = () => {
           {/* Enhanced Candidate Table */}
           <CandidateTable />
         </div>
+
+        {/* Execution Log Console */}
+        <ExecutionLogConsole
+          isVisible={showExecutionLog}
+          isRunning={isRunning}
+          currentStep={currentStep}
+          onClose={() => setShowExecutionLog(false)}
+        />
 
         {/* Job Setup Modal */}
         <JobSetupModal 
