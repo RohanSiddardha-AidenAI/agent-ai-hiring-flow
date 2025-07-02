@@ -17,10 +17,18 @@ interface ExecutionLogConsoleProps {
   isRunning: boolean;
   currentStep: number;
   onClose: () => void;
+  logs?: LogEntry[];
+  onLogAdd?: (log: LogEntry) => void;
 }
 
-const ExecutionLogConsole = ({ isVisible, isRunning, currentStep, onClose }: ExecutionLogConsoleProps) => {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+const ExecutionLogConsole = ({ 
+  isVisible, 
+  isRunning, 
+  currentStep, 
+  onClose, 
+  logs = [], 
+  onLogAdd 
+}: ExecutionLogConsoleProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -83,8 +91,7 @@ const ExecutionLogConsole = ({ isVisible, isRunning, currentStep, onClose }: Exe
   };
 
   useEffect(() => {
-    if (!isRunning) {
-      setLogs([]);
+    if (!isRunning || !onLogAdd) {
       return;
     }
 
@@ -100,20 +107,20 @@ const ExecutionLogConsole = ({ isVisible, isRunning, currentStep, onClose }: Exe
         logSteps.forEach((step, index) => {
           setTimeout(() => {
             const newLog: LogEntry = {
-              id: `${Date.now()}-${agentIndex}-${step}`,
+              id: `${Date.now()}-${agentIndex}-${step}-${Math.random()}`,
               timestamp,
               agent: agentNames[agentIndex],
               action: generateLogMessage(agentIndex, step)
             };
             
-            setLogs(prev => [...prev, newLog].slice(-50)); // Keep last 50 logs
+            onLogAdd(newLog);
           }, index * 800);
         });
       }
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [isRunning, currentStep]);
+  }, [isRunning, currentStep, onLogAdd]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new logs are added

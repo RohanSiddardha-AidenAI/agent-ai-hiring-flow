@@ -1,6 +1,6 @@
 
 import { useState, useMemo } from 'react';
-import { Search, Filter, Download, Users } from 'lucide-react';
+import { Search, Filter, Download, Users, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,14 +8,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { mockCandidates } from '@/data/candidates';
 
-const CandidateTable = () => {
+interface CandidateTableProps {
+  hasWorkflowRun?: boolean;
+  workflowKpis?: {
+    profilesFetched: number;
+    screened: number;
+    shortlisted: number;
+    interviewsScheduled: number;
+    offersGenerated: number;
+  };
+  onScheduleInterview?: (candidateId: string, candidateName: string) => void;
+}
+
+const CandidateTable = ({ hasWorkflowRun = false, workflowKpis, onScheduleInterview }: CandidateTableProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [scoreFilter, setScoreFilter] = useState('all');
   const [sortBy, setSortBy] = useState('score');
 
+  // Only show candidates if a workflow has run
+  const availableCandidates = useMemo(() => {
+    if (!hasWorkflowRun) return [];
+    
+    // Filter candidates based on workflow context
+    return mockCandidates.filter(candidate => {
+      if (workflowKpis) {
+        // Show only shortlisted candidates and above
+        return candidate.screening_score >= 70;
+      }
+      return true;
+    });
+  }, [hasWorkflowRun, workflowKpis]);
+
   const filteredAndSortedCandidates = useMemo(() => {
-    let filtered = mockCandidates.filter(candidate => {
+    let filtered = availableCandidates.filter(candidate => {
       const matchesSearch = candidate.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            candidate.email.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesRole = roleFilter === 'all' || candidate.role_applied === roleFilter;
@@ -42,9 +68,9 @@ const CandidateTable = () => {
     });
 
     return filtered;
-  }, [searchTerm, roleFilter, scoreFilter, sortBy]);
+  }, [availableCandidates, searchTerm, roleFilter, scoreFilter, sortBy]);
 
-  const uniqueRoles = [...new Set(mockCandidates.map(c => c.role_applied))];
+  const uniqueRoles = [...new Set(availableCandidates.map(c => c.role_applied))];
 
   const getScoreBadge = (score: number) => {
     if (score >= 85) return <Badge className="bg-green-100 text-green-800">High</Badge>;
@@ -53,10 +79,36 @@ const CandidateTable = () => {
   };
 
   const getStatusBadge = (score: number) => {
+    if (score >= 90) return <Badge className="bg-purple-100 text-purple-800">Interviewed</Badge>;
     if (score >= 85) return <Badge className="bg-blue-100 text-blue-800">Shortlisted</Badge>;
     if (score >= 70) return <Badge className="bg-orange-100 text-orange-800">Under Review</Badge>;
     return <Badge className="bg-gray-100 text-gray-800">Rejected</Badge>;
   };
+
+  const canScheduleInterview = (score: number) => {
+    return score >= 85 && score < 90; // Shortlisted but not yet interviewed
+  };
+
+  const handleScheduleInterview = (candidate: any) => {
+    if (onScheduleInterview) {
+      onScheduleInterview(candidate.email, candidate.name);
+    }
+  };
+
+  // Don't show the table if no workflow has run
+  if (!hasWorkflowRun) {
+    return (
+      <Card className="mt-8">
+        <CardContent className="py-12">
+          <div className="text-center text-[#4d4d4d]">
+            <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-lg font-semibold mb-2">No Workflow Executed</h3>
+            <p>Start a simulation to view candidate results in the pipeline.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="mt-8">
@@ -67,7 +119,7 @@ const CandidateTable = () => {
             <div>
               <CardTitle className="text-[#002b5c]">Candidate Pipeline</CardTitle>
               <p className="text-sm text-[#4d4d4d]">
-                Showing {filteredAndSortedCandidates.length} of {mockCandidates.length} candidates
+                Showing {filteredAndSortedCandidates.length} of {availableCandidates.length} candidates from last workflow
               </p>
             </div>
           </div>
@@ -142,6 +194,7 @@ const CandidateTable = () => {
                 <TableHead className="font-semibold text-[#002b5c]">Experience</TableHead>
                 <TableHead className="font-semibold text-[#002b5c]">Score</TableHead>
                 <TableHead className="font-semibold text-[#002b5c]">Status</TableHead>
+                <TableHead className="font-semibold text-[#002b5c]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -182,6 +235,19 @@ const CandidateTable = () => {
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(candidate.screening_score)}
+                  </TableCell>
+                  <TableCell>
+                    {canScheduleInterview(candidate.screening_score) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleScheduleInterview(candidate)}
+                        className="flex items-center space-x-1"
+                      >
+                        <Calendar className="w-3 h-3" />
+                        <span>Schedule Interview</span>
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
