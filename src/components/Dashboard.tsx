@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from 'react';
 import { Bot, Activity, CheckCircle, Clock, Users, Target, TrendingUp, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,13 @@ import WorkflowHistory from './WorkflowHistory';
 import ExecutionLogConsole from './ExecutionLogConsole';
 import { agents } from '@/data/agents';
 
+interface LogEntry {
+  timestamp: string;
+  agent: string;
+  action: string;
+  id: string;
+}
+
 interface WorkflowExecution {
   id: string;
   timestamp: Date;
@@ -29,6 +37,7 @@ interface WorkflowExecution {
     interviewsScheduled: number;
     offersGenerated: number;
   };
+  logs?: LogEntry[];
 }
 
 const Dashboard = () => {
@@ -51,6 +60,8 @@ const Dashboard = () => {
   const [sessionProcessedCounts, setSessionProcessedCounts] = useState<{ [key: string]: number }>({});
   const [showExecutionLog, setShowExecutionLog] = useState(false);
   const [selectedHistoryExecution, setSelectedHistoryExecution] = useState<WorkflowExecution | null>(null);
+  const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
+  const [hasWorkflowRun, setHasWorkflowRun] = useState(false);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -80,6 +91,58 @@ const Dashboard = () => {
     handleStartSimulation(true);
   };
 
+  const handleScheduleInterview = (candidateId: string, candidateName: string) => {
+    // Trigger Interview Agent animation
+    setCurrentStep(7); // Interview Agent is at index 7
+    setAgentStatuses(prev => prev.map((agent, index) => 
+      index === 7 ? { ...agent, status: 'running' } : agent
+    ));
+
+    // Add log entry for interview scheduling
+    const now = new Date();
+    const timestamp = now.toTimeString().substring(0, 8);
+    const newLog: LogEntry = {
+      id: `${Date.now()}-interview-${candidateId}`,
+      timestamp,
+      agent: 'Interview Agent',
+      action: `Interview scheduled for ${candidateName} at 11:00 AM`
+    };
+    
+    setExecutionLogs(prev => [...prev, newLog]);
+
+    // Simulate interview completion after 3 seconds
+    setTimeout(() => {
+      setAgentStatuses(prev => prev.map((agent, index) => 
+        index === 7 ? { ...agent, status: 'completed' } : agent
+      ));
+
+      const completionLog: LogEntry = {
+        id: `${Date.now()}-interview-complete-${candidateId}`,
+        timestamp: new Date().toTimeString().substring(0, 8),
+        agent: 'Interview Agent',
+        action: `Interview completed for ${candidateName} - Score: 88/100`
+      };
+      
+      setExecutionLogs(prev => [...prev, completionLog]);
+
+      // Update interview count
+      setWorkflowStats(prev => ({
+        ...prev,
+        interviewsScheduled: prev.interviewsScheduled + 1
+      }));
+
+      if (currentExecution) {
+        setCurrentExecution(prev => prev ? {
+          ...prev,
+          kpis: {
+            ...prev.kpis,
+            interviewsScheduled: prev.kpis.interviewsScheduled + 1
+          }
+        } : null);
+      }
+    }, 3000);
+  };
+
   const handleStartSimulation = (fromJobSetup = false) => {
     const isManual = simulationMode === 'manual';
     
@@ -90,7 +153,9 @@ const Dashboard = () => {
 
     setIsRunning(true);
     setCurrentStep(0);
-    setShowExecutionLog(true); // Show execution log when simulation starts
+    setShowExecutionLog(true);
+    setHasWorkflowRun(true);
+    setExecutionLogs([]); // Reset logs for new execution
     
     // Create new execution record
     const newExecution: WorkflowExecution = {
@@ -106,7 +171,8 @@ const Dashboard = () => {
         shortlisted: 0,
         interviewsScheduled: 0,
         offersGenerated: 0
-      }
+      },
+      logs: []
     };
     
     setCurrentExecution(newExecution);
@@ -320,6 +386,7 @@ const Dashboard = () => {
             currentExecution={currentExecution}
             onAddExecution={() => {}}
             onExecutionSelect={handleHistoryExecutionSelect}
+            executionLogs={executionLogs}
           />
 
           {/* Workflow Stats */}
@@ -490,7 +557,11 @@ const Dashboard = () => {
           </div>
 
           {/* Enhanced Candidate Table */}
-          <CandidateTable />
+          <CandidateTable 
+            hasWorkflowRun={hasWorkflowRun}
+            workflowKpis={workflowStats}
+            onScheduleInterview={handleScheduleInterview}
+          />
         </div>
 
         {/* Execution Log Console */}
@@ -499,6 +570,8 @@ const Dashboard = () => {
           isRunning={isRunning}
           currentStep={currentStep}
           onClose={() => setShowExecutionLog(false)}
+          logs={executionLogs}
+          onLogAdd={(log) => setExecutionLogs(prev => [...prev, log])}
         />
 
         {/* Job Setup Modal */}
