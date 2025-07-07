@@ -2,16 +2,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin, Users, CheckCircle, Calendar, FileText, ChevronRight, Eye, Terminal } from 'lucide-react';
+import { Clock, MapPin, Users, CheckCircle, Calendar, FileText, ChevronRight, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-
-interface LogEntry {
-  timestamp: string;
-  agent: string;
-  action: string;
-  id: string;
-}
+import { JobData } from './JobSetupModal';
 
 interface WorkflowExecution {
   id: string;
@@ -27,7 +20,6 @@ interface WorkflowExecution {
     interviewsScheduled: number;
     offersGenerated: number;
   };
-  logs?: LogEntry[];
   detailedMetrics?: {
     talentInsight: { processed: number; insights: string[] };
     recruiterAssist: { processed: number; jdGenerated: boolean };
@@ -44,14 +36,12 @@ interface WorkflowHistoryProps {
   currentExecution?: WorkflowExecution;
   onAddExecution: (execution: WorkflowExecution) => void;
   onExecutionSelect?: (execution: WorkflowExecution | null) => void;
-  executionLogs?: LogEntry[];
 }
 
-const WorkflowHistory = ({ currentExecution, onAddExecution, onExecutionSelect, executionLogs = [] }: WorkflowHistoryProps) => {
+const WorkflowHistory = ({ currentExecution, onAddExecution, onExecutionSelect }: WorkflowHistoryProps) => {
   const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
   const [selectedExecution, setSelectedExecution] = useState<WorkflowExecution | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showLogsModal, setShowLogsModal] = useState(false);
 
   useEffect(() => {
     // Load from localStorage on component mount
@@ -76,18 +66,13 @@ const WorkflowHistory = ({ currentExecution, onAddExecution, onExecutionSelect, 
       setExecutions(prev => {
         const exists = prev.find(exec => exec.id === currentExecution.id);
         if (!exists) {
-          // Attach logs to the execution before storing
-          const executionWithLogs = {
-            ...currentExecution,
-            logs: executionLogs
-          };
-          const newExecutions = [executionWithLogs, ...prev].slice(0, 10); // Keep only last 10
+          const newExecutions = [currentExecution, ...prev].slice(0, 10); // Keep only last 10
           return newExecutions;
         }
         return prev;
       });
     }
-  }, [currentExecution, executionLogs]);
+  }, [currentExecution]);
 
   const formatDateTime = (date: Date) => {
     return {
@@ -100,12 +85,6 @@ const WorkflowHistory = ({ currentExecution, onAddExecution, onExecutionSelect, 
     setSelectedExecution(execution);
     setShowDetailsModal(true);
     onExecutionSelect?.(execution);
-  };
-
-  const handleViewLogs = (execution: WorkflowExecution, event: React.MouseEvent) => {
-    event.stopPropagation();
-    setSelectedExecution(execution);
-    setShowLogsModal(true);
   };
 
   const getStatusIcon = (status: string) => {
@@ -168,27 +147,13 @@ const WorkflowHistory = ({ currentExecution, onAddExecution, onExecutionSelect, 
             <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-semibold text-[#002b5c]">Current Execution</h4>
-                <div className="flex items-center space-x-2">
-                  <Badge className={currentExecution.status === 'running' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}>
-                    <div className="flex items-center space-x-1">
-                      {getStatusIcon(currentExecution.status)}
-                      <span className="capitalize">{currentExecution.status}</span>
-                    </div>
-                  </Badge>
-                  {currentExecution.status === 'completed' && executionLogs.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => handleViewLogs(currentExecution, e)}
-                      className="flex items-center space-x-1"
-                    >
-                      <Terminal className="w-3 h-3" />
-                      <span>View Logs</span>
-                    </Button>
-                  )}
-                </div>
+                <Badge className={currentExecution.status === 'running' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}>
+                  <div className="flex items-center space-x-1">
+                    {getStatusIcon(currentExecution.status)}
+                    <span className="capitalize">{currentExecution.status}</span>
+                  </div>
+                </Badge>
               </div>
-              
               <div className="grid md:grid-cols-2 gap-4 mb-3">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-[#4d4d4d]">Role:</span>
@@ -272,23 +237,10 @@ const WorkflowHistory = ({ currentExecution, onAddExecution, onExecutionSelect, 
                           <span>{execution.kpis.shortlisted} shortlisted</span>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {execution.logs && execution.logs.length > 0 && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={(e) => handleViewLogs(execution, e)}
-                            className="flex items-center space-x-1"
-                          >
-                            <Terminal className="w-3 h-3" />
-                            <span>Logs</span>
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" className="flex items-center space-x-1">
-                          <Eye className="w-3 h-3" />
-                          <span>Details</span>
-                        </Button>
-                      </div>
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Eye className="w-3 h-3 mr-1" />
+                        View Details
+                      </Button>
                     </div>
                   </div>
                 );
@@ -297,42 +249,6 @@ const WorkflowHistory = ({ currentExecution, onAddExecution, onExecutionSelect, 
           </div>
         </CardContent>
       </Card>
-
-      {/* Execution Logs Modal */}
-      <Dialog open={showLogsModal} onOpenChange={setShowLogsModal}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-[#002b5c] flex items-center space-x-2">
-              <Terminal className="w-5 h-5" />
-              <span>Execution Log Console - {selectedExecution?.jobTitle}</span>
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedExecution && (
-            <div className="space-y-4">
-              <div className="text-sm text-[#4d4d4d]">
-                Executed on {formatDateTime(selectedExecution.timestamp).date} at {formatDateTime(selectedExecution.timestamp).time}
-              </div>
-              
-              <ScrollArea className="h-96 w-full">
-                <div className="font-mono text-xs bg-gray-900 text-green-400 p-4 rounded">
-                  {selectedExecution.logs && selectedExecution.logs.length > 0 ? (
-                    selectedExecution.logs.map((log) => (
-                      <div key={log.id} className="flex space-x-2 mb-1">
-                        <span className="text-gray-400">[{log.timestamp}]</span>
-                        <span className="text-blue-400">{log.agent}:</span>
-                        <span className="text-green-400">{log.action}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-gray-500">No logs available for this execution</div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Detailed Metrics Modal */}
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
